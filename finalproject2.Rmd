@@ -1,0 +1,84 @@
+---
+title: "Practical Machine Learning Project"
+author: "Joseph"
+date: "Saturday, August 23, 2014"
+output: html_document
+---
+
+***Overview***
+
+Using devices such as Jawbone Up, Nike FuelBand, and Fitbit it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify how well they do it. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: http://groupware.les.inf.puc-rio.br/har (see the section on the Weight Lifting Exercise Dataset).
+
+***Goal***
+
+The goal of your project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. You may use any of the other variables to predict with. You should create a report describing how you built your model, how you used cross validation, what you think the expected out of sample error is, and why you made the choices you did. You will also use your prediction model to predict 20 different test cases. 
+
+***Strategy***
+
+***Step1:load in the datasets and process them into a training and validation set***
+```{r}
+library(caret)
+
+train <- read.csv("pml-training.csv", header = TRUE)
+test <- read.csv("pml-testing.csv",  header = TRUE)
+
+set.seed(33456)
+trainset <- createDataPartition(train$classe, p = 0.8, list = FALSE)
+training <- train[trainset, ]
+Validation <- train[-trainset, ]
+```
+
+***Step 2: Clean data***
+
+```{r}
+nz <- nearZeroVar(training)
+training <- training[, -nz]
+cnt <- sapply(training, function(x) {
+    sum(!(is.na(x) | x == ""))
+})
+nullcol <- names(cnt[cnt < 0.6 * length(training$classe)])
+descriptcol <- c("X", "user_name", "raw_timestamp_part_1", "raw_timestamp_part_2", 
+    "cvtd_timestamp", "new_window", "num_window")
+excludecols <- c(descriptcol, nullcol)
+training <- training[, !names(training) %in% excludecols]
+```
+***STEP 3: Create Model***
+```{r}
+
+library(randomForest)
+rfModel <- randomForest(classe ~ ., data = training, importance = TRUE, ntrees = 10)
+```
+
+***STEP 4: Model Validation & Test set Accuracy***
+```{r}
+ptraining <- predict(rfModel, training)
+print(confusionMatrix(ptraining, training$classe))
+```
+
+***STEP 5: Cross Validation***
+```{r}
+pval<- predict(rfModel, Validation)
+print(confusionMatrix(pval, Validation$classe))
+```
+When analyzing the cross validation set, we see that the validation accuracy is 99.7% and the out-of-sample error is 0.3%.
+
+***STEP 6: Prediciton of test set***
+```{r}
+ptest <- predict(rfModel, test)
+```
+
+***STEP 7: Save Output***
+```{r}
+answers <- as.vector(ptest)
+
+pml_write_files = function(x) {
+    n = length(x)
+    for (i in 1:n) {
+        filename = paste0("problem_id_", i, ".txt")
+        write.table(x[i], file = filename, quote = FALSE, row.names = FALSE, 
+            col.names = FALSE)
+    }
+}
+
+pml_write_files(answers)
+```
